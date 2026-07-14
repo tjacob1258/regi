@@ -7,7 +7,17 @@ Built for workflows that *aren't* a fixed auto-advancing schedule — you trigge
 as the bench work allows, and often run the same step for several samples staggered a few minutes
 apart (e.g. free-floating IHC sections dropped into wells one at a time).
 
-## Run it
+## Live app
+
+Regi is deployed at **[regi-sooty.vercel.app](https://regi-sooty.vercel.app/)** — open it in any
+browser, no install required. It auto-deploys from the `main` branch of this repo
+([tjacob1258/regi](https://github.com/tjacob1258/regi)) via Vercel, so every push goes live within
+seconds.
+
+Data is stored per-browser (see [Data & persistence](#data--persistence) below), so the hosted
+version and a local copy don't share protocols or run logs unless you export/import between them.
+
+## Run it locally
 
 **Recommended (macOS): double-click `Regi.command`.** It starts a tiny local web server and opens
 the app in your browser, with **saving enabled**. Leave the Terminal window it opens running while
@@ -43,9 +53,9 @@ dependencies, works fully offline.
   and add / delete / reorder parameters with a default duration (minutes + seconds). Reorder
   parameters by **dragging the ⠿ handle** (the ▲▼ arrows still work as a fallback on touch). Use
   the **⋯** menu next to the protocol pill to create a new protocol, duplicate the current one, or
-  delete it (disabled when it's your only one). Every text field (protocol name/description, step
-  title, note, parameter label) has a **🎤 dictate button** — tap it and speak to fill the field
-  hands-free; speaking again appends rather than replacing.
+  delete it — deleting your last protocol just returns you to the welcome screen. Every text field
+  (protocol name/description, step title, note, parameter label) has a **🎤 dictate button** — tap
+  it and speak to fill the field hands-free; speaking again appends rather than replacing.
 - **Run Log** — every stopped or completed timer is recorded with planned vs. actual time and
   **drift** (actual − planned, colored). A per-parameter summary shows mean drift across runs so
   systematic drift is visible over time. Filter by protocol / parameter, **Export JSON** for
