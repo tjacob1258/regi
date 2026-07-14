@@ -27,6 +27,10 @@ dependencies, works fully offline.
 > ```
 > then open http://localhost:8000/index.html
 
+> 🎤 **Voice dictation needs Chrome or Safari, and a network connection.** Firefox doesn't support
+> the browser's speech API — the 🎤 buttons simply don't appear there. In supported browsers,
+> transcription happens server-side, so dictation won't work fully offline; typing always does.
+
 ## Using it
 
 - **Run** — the active protocol's steps, each with a troubleshooting note and tappable parameter
@@ -37,9 +41,11 @@ dependencies, works fully offline.
   flashes until you **Dismiss** it. Use **Silence** to quiet the alarm.
 - **Edit** — rename the protocol, add / delete / reorder steps (▲▼), edit troubleshooting notes,
   and add / delete / reorder parameters with a default duration (minutes + seconds). Reorder
-  parameters by **dragging the ⠿ handle** (the ▲▼ arrows still work as a fallback on touch).
-  Create a fresh protocol with **+ New** (it opens in Edit with the name selected) or copy the
-  current one with **Duplicate**.
+  parameters by **dragging the ⠿ handle** (the ▲▼ arrows still work as a fallback on touch). Use
+  the **⋯** menu next to the protocol pill to create a new protocol, duplicate the current one, or
+  delete it (disabled when it's your only one). Every text field (protocol name/description, step
+  title, note, parameter label) has a **🎤 dictate button** — tap it and speak to fill the field
+  hands-free; speaking again appends rather than replacing.
 - **Run Log** — every stopped or completed timer is recorded with planned vs. actual time and
   **drift** (actual − planned, colored). A per-parameter summary shows mean drift across runs so
   systematic drift is visible over time. Filter by protocol / parameter, **Export JSON** for
@@ -62,5 +68,7 @@ Data is per-browser/per-device. Use **Run Log → Export JSON** to back up or mo
 
 ## Sample data
 
-On first load Regi seeds an **IHC (free-floating sections)** protocol as an editable starting
-point. Edit it freely or delete it once you've added your own — protocols are fully general.
+Regi opens **blank** — a welcome screen prompts you to create a protocol. If you'd rather start
+from an example, the welcome screen offers a one-click **IHC (free-floating sections)** sample
+protocol, fully editable like any other. Delete it any time — deleting your last protocol just
+returns you to the welcome screen.
