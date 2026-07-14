@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f1720" />
+<title>Regi — Bench Protocol Timers</title>
+<style>
+  :root {
+    --bg: #0f1720;
+    --panel: #16212e;
+    --panel-2: #1d2b3a;
+    --border: #26374a;
+    --text: #e7eef6;
+    --muted: #8ea3b8;
+    --accent: #4fb0ff;
+    --accent-2: #2b6cb0;
+    --good: #3ddc84;
+    --warn: #ffb020;
+    --bad: #ff6b6b;
+    --chip: #21344a;
+    --chip-hover: #2b4763;
+    --radius: 12px;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+    font-synthesis: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 190px; /* room for the dock */
+  }
+  h1, h2, h3 { margin: 0 0 .4em; font-weight: 650; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input, textarea, select {
+    font: inherit; color: var(--text);
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 9px;
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  textarea { width: 100%; resize: vertical; min-height: 44px; }
+  a { color: var(--accent); }
+
+  /* ---- Layout ---- */
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(15,23,32,.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  .brand { font-weight: 750; letter-spacing: .3px; font-size: 18px; margin-right: 4px; }
+  .brand .dot { color: var(--accent); }
+  header .spacer { flex: 1 1 auto; }
+  .tabs { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+  .tab { padding: 6px 14px; border-radius: 8px; border: 0; background: transparent; color: var(--muted); font-weight: 600; }
+  .tab.active { background: var(--accent-2); color: #fff; }
+  .protocol-picker { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .protocol-list {
+    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin;
+    max-width: 42vw; padding: 2px 1px 6px;
+  }
+  .protocol-pill {
+    flex: 0 0 auto; padding: 7px 14px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    font-weight: 600; white-space: nowrap;
+  }
+  .protocol-pill:hover:not(.active) { background: var(--panel-2); color: var(--text); }
+  .protocol-pill.active { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+
+  .menu-wrap { position: relative; flex: 0 0 auto; }
+  .menu-btn {
+    width: 34px; height: 34px; display: grid; place-items: center;
+    border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); font-size: 18px; line-height: 1; letter-spacing: 1px;
+  }
+  .menu-btn:hover, .menu-btn[aria-expanded="true"] { background: var(--panel); }
+  .menu-popover {
+    position: absolute; top: calc(100% + 6px); left: 0; min-width: 200px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: var(--shadow); padding: 6px; z-index: 50;
+  }
+  .menu-popover[hidden] { display: none; }
+  .menu-item {
+    display: block; width: 100%; text-align: left; padding: 9px 11px;
+    border-radius: 7px; background: transparent; border: 0; color: var(--text);
+    font-weight: 600; font-size: 14px;
+  }
+  .menu-item:hover:not(:disabled) { background: var(--panel-2); }
+  .menu-item.danger { color: var(--bad); }
+  .menu-item:disabled { opacity: .4; cursor: not-allowed; }
+  .menu-divider { height: 1px; background: var(--border); margin: 5px 3px; }
+
+  main { max-width: 1000px; margin: 0 auto; padding: 18px 16px 40px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .btn { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-weight: 600; }
+  .btn:hover { background: var(--panel); }
+  .btn.primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost { background: transparent; }
+  .btn.danger { color: var(--bad); border-color: #4a2b33; }
+  .btn.small { padding: 4px 9px; font-size: 13px; }
+  .btn.icon { padding: 4px 8px; line-height: 1; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn:disabled:hover { background: var(--panel-2); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .muted { color: var(--muted); }
+  .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+
+  /* ---- Run view ---- */
+  .step {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px;
+  }
+  .step-head { display: flex; align-items: baseline; gap: 10px; }
+  .step-num {
+    flex: 0 0 auto; width: 26px; height: 26px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    display: grid; place-items: center; font-size: 13px; color: var(--muted); font-weight: 700;
+  }
+  .step-title { font-size: 16px; font-weight: 650; }
+  .note {
+    margin-top: 8px; padding: 8px 10px 8px 12px; border-left: 3px solid var(--warn);
+    background: rgba(255,176,32,.08); border-radius: 0 8px 8px 0;
+    color: #f0d9ac; font-size: 13.5px;
+  }
+  .note .note-label { color: var(--warn); font-weight: 700; margin-right: 6px; text-transform: uppercase; font-size: 11px; letter-spacing: .5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--chip); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 12px; border-radius: 999px; font-weight: 600;
+    transition: transform .05s ease, background .12s ease;
+  }
+  .chip:hover { background: #2b4763; }
+  .chip:active { transform: scale(.96); }
+  .chip .dur { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .chip .count {
+    min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+    background: var(--good); color: #06301b; font-size: 12px; font-weight: 800;
+    display: inline-grid; place-items: center;
+  }
+  .empty { color: var(--muted); text-align: center; padding: 40px 10px; }
+
+  /* ---- Dock ---- */
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    background: rgba(19,28,39,.96); backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border); box-shadow: 0 -6px 24px rgba(0,0,0,.35);
+    max-height: 42vh; overflow: auto;
+  }
+  .dock-inner { max-width: 1100px; margin: 0 auto; padding: 10px 14px 14px; }
+  .dock-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .dock-head h3 { margin: 0; font-size: 13px; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+  .timers { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .timer {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 12px; position: relative; overflow: hidden;
+  }
+  .timer .t-meta { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .timer .t-meta b { color: var(--text); font-weight: 650; }
+  .timer .t-time { font-size: 30px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: .5px; margin: 2px 0 6px; }
+  .timer .t-bar { height: 5px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin-bottom: 9px; }
+  .timer .t-fill { height: 100%; width: 0%; background: var(--accent); transition: width .25s linear; }
+  .timer .t-controls { display: flex; gap: 6px; }
+  .timer.paused { opacity: .82; }
+  .timer.paused .t-fill { background: var(--warn); }
+  .timer.done { border-color: var(--good); }
+  .timer.done .t-time { color: var(--good); }
+  .timer.done { animation: flash 1s steps(1) infinite; }
+  @keyframes flash {
+    50% { background: rgba(61,220,132,.16); }
+  }
+  .badge-overtime { color: var(--bad); }
+
+  /* ---- Edit view ---- */
+  .edit-step { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; }
+  .edit-step .es-head { display: flex; gap: 8px; align-items: center; }
+  .edit-step .es-head input { flex: 1 1 auto; font-weight: 650; }
+  .es-order { display: flex; flex-direction: column; gap: 2px; }
+  .param-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; border-radius: 8px; }
+  .param-row .p-label { flex: 1 1 180px; min-width: 140px; }
+  .drag-handle {
+    cursor: grab; color: var(--muted); font-size: 17px; line-height: 1;
+    padding: 6px 4px; align-self: center; user-select: none; touch-action: none;
+    border-radius: 6px;
+  }
+  .drag-handle:hover { color: var(--text); background: var(--panel-2); }
+  .drag-handle:active { cursor: grabbing; }
+  .param-row.dragging { opacity: .45; }
+  .param-row.drop-before { box-shadow: inset 0 3px 0 0 var(--accent); }
+  .param-row.drop-after { box-shadow: inset 0 -3px 0 0 var(--accent); }
+  .dur-input { display: inline-flex; align-items: center; gap: 4px; }
+  .dur-input input { width: 62px; text-align: right; }
+  .field { margin: 10px 0; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .4px; }
+
+  /* ---- Run Log ---- */
+  .logbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 650; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; position: sticky; top: 0; background: var(--panel); z-index: 1; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  .drift-pos { color: var(--bad); }
+  .drift-neg { color: var(--good); }
+  .drift-zero { color: var(--muted); }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; font-weight: 700; }
+  .tag.completed { background: rgba(61,220,132,.15); color: var(--good); }
+  .tag.stopped { background: rgba(255,176,32,.15); color: var(--warn); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; margin-bottom: 18px; }
+  .summary-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .summary-card .sc-label { font-weight: 650; }
+  .summary-card .sc-stat { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+  @media (max-width: 560px) {
+    .protocol-list { max-width: 60vw; }
+    .brand { font-size: 16px; }
+    header { padding: 8px 12px; gap: 8px; }
+    main { padding: 14px 12px 30px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Regi<span class="dot">·</span></div>
+  <div class="protocol-picker">
+    <div class="protocol-list" id="protocolList" role="tablist" aria-label="Protocols"></div>
+    <div class="menu-wrap">
+      <button class="menu-btn" data-act="toggle-protocol-menu" title="Protocol actions" aria-haspopup="true" aria-expanded="false">⋯</button>
+      <div class="menu-popover" id="protocolMenu" hidden>
+        <button class="menu-item" data-act="new-protocol">+ New protocol</button>
+        <button class="menu-item" data-act="duplicate-protocol">Duplicate protocol</button>
+        <div class="menu-divider"></div>
+        <button class="menu-item danger" id="deleteProtocolMenuItem" data-act="del-protocol">Delete protocol</button>
+      </div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-view="run">Run</button>
+    <button class="tab" data-view="edit">Edit</button>
+    <button class="tab" data-view="log">Run Log</button>
+  </div>
+</header>
+
+<main>
+  <section id="view-run" class="view active"></section>
+  <section id="view-edit" class="view"></section>
+  <section id="view-log" class="view"></section>
+</main>
+
+<div class="dock" id="dock" hidden>
+  <div class="dock-inner">
+    <div class="dock-head">
+      <h3>Active Timers</h3>
+      <span class="pill" id="dockCount">0</span>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn small ghost" data-act="silence-all" id="silenceBtn" hidden>Silence</button>
+      <button class="btn small ghost" data-act="clear-done" id="clearDoneBtn" hidden>Clear done</button>
+    </div>
+    <div class="timers" id="timers"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function () {
+  /* ============================ Utilities ============================ */
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-" + Math.random().toString(36).slice(2) + Date.now().toString(36));
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // "125" seconds -> "2:05"; large -> "1:02:05"
+  function fmtClock(totalSec) {
+    totalSec = Math.max(0, Math.round(totalSec));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const mm = String(m).padStart(h ? 2 : 1, "0");
+    const ss = String(s).padStart(2, "0");
+    return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${mm}:${ss}`;
+  }
+  // Human duration for chips: prefers whole minutes.
+  function fmtDur(sec) {
+    if (sec % 60 === 0) {
+      const m = sec / 60;
+      if (m % 60 === 0 && m >= 120) return `${m / 60} h`;
+      return `${m} min`;
+    }
+    return fmtClock(sec);
+  }
+  // signed drift like "+0:12" / "-1:30"
+  function fmtDrift(sec) {
+    const sign = sec > 0 ? "+" : sec < 0 ? "-" : "";
+    return sign + fmtClock(Math.abs(sec));
+  }
+  function fmtDateTime(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  /* ============================ Store ============================ */
+  const KEYS = {
+    protocols: "regi.protocols",
+    runlog: "regi.runlog",
+    active: "regi.activeProtocolId",
+    version: "regi.schemaVersion",
+  };
+  const SCHEMA_VERSION = 1;
+
+  // Safe localStorage wrappers. Some environments (file:// in Safari/Firefox,
+  // private-browsing modes, storage-disabled configs) throw on read/write.
+  // We degrade gracefully: the app keeps working in memory for the session,
+  // and we warn once so persistence-loss isn't silent.
+  let storageWarned = false;
+  function warnStorage(err) {
+    if (storageWarned) return;
+    storageWarned = true;
+    console.warn("Regi: browser storage is unavailable — your protocols and run log " +
+      "won't be saved this session. Open the app over http:// (see README) or use a " +
+      "normal (non-private) window to enable saving.", err);
+  }
+  const ls = {
+    get(key) {
+      try { return localStorage.getItem(key); }
+      catch (err) { warnStorage(err); return null; }
+    },
+    set(key, val) {
+      try { localStorage.setItem(key, val); return true; }
+      catch (err) { warnStorage(err); return false; }
+    },
+    remove(key) {
+      try { localStorage.removeItem(key); } catch (err) { warnStorage(err); }
+    },
+  };
+
+  function seedProtocol() {
+    const step = (title, note, params) => ({
+      id: uid(), title, note: note || "",
+      params: params.map((p) => ({ id: uid(), label: p[0], defaultDurationSec: p[1] })),
+    });
+    const m = (min) => min * 60;
+    return {
+      id: uid(),
+      name: "IHC — Free-floating sections",
+      description: "Immunohistochemistry on free-floating sections (DAB or fluorescence).",
+      steps: [
+        step("PBS wash", "Handle sections with a fine brush; avoid folding or tearing.",
+          [["Wash 1", m(5)], ["Wash 2", m(5)], ["Wash 3", m(5)]]),
+        step("Quench endogenous peroxidase", "Skip for fluorescence detection.",
+          [["H₂O₂ / methanol", m(30)]]),
+        step("Block", "Insufficient blocking → high background. Don't shortcut this.",
+          [["Blocking buffer", m(60)]]),
+        step("Primary antibody", "If weak signal, extend incubation or raise antibody concentration.",
+          [["Primary incubation", m(720)]]),
+        step("PBS wash", "",
+          [["Wash 1", m(10)], ["Wash 2", m(10)], ["Wash 3", m(10)]]),
+        step("Secondary antibody", "Keep in the dark for fluorophore-conjugated secondaries.",
+          [["Secondary incubation", m(120)]]),
+        step("PBS wash", "",
+          [["Wash 1", m(10)], ["Wash 2", m(10)], ["Wash 3", m(10)]]),
+        step("Detection (ABC / DAB)", "Watch DAB closely; stop development as soon as signal appears.",
+          [["ABC", m(60)], ["DAB develop", m(5)]]),
+      ],
+    };
+  }
+
+  const store = {
+    protocols: [],
+    runlog: [],
+    activeId: null,
+
+    load() {
+      try {
+        this.protocols = JSON.parse(ls.get(KEYS.protocols) || "null");
+      } catch (_) { this.protocols = null; }
+      try {
+        this.runlog = JSON.parse(ls.get(KEYS.runlog) || "null") || [];
+      } catch (_) { this.runlog = []; }
+
+      if (!Array.isArray(this.protocols) || this.protocols.length === 0) {
+        this.protocols = [seedProtocol()];
+        this.saveProtocols();
+      }
+      this.activeId = ls.get(KEYS.active);
+      if (!this.protocols.some((p) => p.id === this.activeId)) {
+        this.activeId = this.protocols[0].id;
+        this.saveActive();
+      }
+      ls.set(KEYS.version, String(SCHEMA_VERSION));
+    },
+    saveProtocols() { ls.set(KEYS.protocols, JSON.stringify(this.protocols)); },
+    saveRunlog() { ls.set(KEYS.runlog, JSON.stringify(this.runlog)); },
+    saveActive() { ls.set(KEYS.active, this.activeId || ""); },
+
+    active() { return this.protocols.find((p) => p.id === this.activeId) || this.protocols[0]; },
+    findStep(protocol, stepId) { return protocol.steps.find((s) => s.id === stepId); },
+    findParam(protocol, paramId) {
+      for (const s of protocol.steps) {
+        const p = s.params.find((x) => x.id === paramId);
+        if (p) return { step: s, param: p };
+      }
+      return null;
+    },
+    addRun(entry) { this.runlog.unshift(entry); this.saveRunlog(); },
+  };
+
+  /* ============================ Alarm (Web Audio) ============================ */
+  const alarm = {
+    ctx: null,
+    activeCount: 0,
+    loopTimer: null,
+    unlock() {
+      if (!this.ctx) {
+        try {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (_) { this.ctx = null; }
+      }
+      if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
+    },
+    beep() {
+      if (!this.ctx) return;
+      const t0 = this.ctx.currentTime;
+      const seq = [880, 1174]; // two-tone chirp
+      seq.forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const start = t0 + i * 0.18;
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.35, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
+        osc.connect(gain).connect(this.ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.18);
+      });
+    },
+    start() {
+      this.unlock();
+      this.activeCount++;
+      if (this.loopTimer == null) {
+        this.beep();
+        this.loopTimer = setInterval(() => this.beep(), 1400);
+      }
+    },
+    stopOne() {
+      this.activeCount = Math.max(0, this.activeCount - 1);
+      if (this.activeCount === 0) this.stopAll();
+    },
+    stopAll() {
+      this.activeCount = 0;
+      if (this.loopTimer != null) { clearInterval(this.loopTimer); this.loopTimer = null; }
+    },
+  };
+
+  /* ============================ Timer engine ============================ */
+  // ActiveTimer: { id, paramId, protocolId, protocolName, stepTitle, paramLabel,
+  //                plannedSec, startedAt, state:'running'|'paused'|'done',
+  //                accumulatedMs, runStartMs, startedIso, doneFired }
+  const timers = {
+    list: [],
+    tick: null,
+
+    elapsedMs(t) {
+      let ms = t.accumulatedMs;
+      if (t.state === "running") ms += Date.now() - t.runStartMs;
+      return ms;
+    },
+    remainingSec(t) { return t.plannedSec - this.elapsedMs(t) / 1000; },
+
+    add({ protocol, step, param }) {
+      alarm.unlock(); // this call is inside a user gesture (chip tap)
+      const now = Date.now();
+      const t = {
+        id: uid(),
+        paramId: param.id,
+        protocolId: protocol.id,
+        protocolName: protocol.name,
+        stepTitle: step.title,
+        paramLabel: param.label,
+        plannedSec: param.defaultDurationSec,
+        startedIso: new Date(now).toISOString(),
+        state: "running",
+        accumulatedMs: 0,
+        runStartMs: now,
+        doneFired: false,
+      };
+      this.list.push(t);
+      this.ensureTicking();
+      renderDock();
+      renderRunChipsCounts();
+    },
+    pauseResume(id) {
+      const t = this.list.find((x) => x.id === id);
+      if (!t || t.state === "done") return;
+      if (t.state === "running") {
+        t.accumulatedMs += Date.now() - t.runStartMs;
+        t.state = "paused";
+      } else {
+        t.runStartMs = Date.now();
+        t.state = "running";
+        this.ensureTicking();
+      }
+      renderDock();
+    },
+    stop(id) {
+      const t = this.list.find((x) => x.id === id);
+      if (!t) return;
+      if (t.state === "done") { this.dismiss(id); return; }
+      this.log(t, "stopped");
+      this.remove(id);
+    },
+    dismiss(id) {
+      const t = this.list.find((x) => x.id === id);
+      if (t && t.state === "done") alarm.stopOne();
+      this.remove(id);
+    },
+    remove(id) {
+      this.list = this.list.filter((x) => x.id !== id);
+      renderDock();
+      renderRunChipsCounts();
+    },
+    complete(t) {
+      if (t.state === "running") t.accumulatedMs += Date.now() - t.runStartMs;
+      t.state = "done";
+      t.doneFired = true;
+      this.log(t, "completed");
+      alarm.start();
+      renderDock();
+      renderRunChipsCounts();
+      if ($("#view-log").classList.contains("active")) renderLog();
+    },
+    log(t, outcome) {
+      const actualSec = Math.round(this.elapsedMs(t) / 1000);
+      const plannedSec = t.plannedSec;
+      store.addRun({
+        id: uid(),
+        protocolId: t.protocolId,
+        protocolName: t.protocolName,
+        stepTitle: t.stepTitle,
+        paramLabel: t.paramLabel,
+        plannedSec,
+        actualSec,
+        driftSec: actualSec - plannedSec,
+        startedAt: t.startedIso,
+        endedAt: new Date().toISOString(),
+        outcome,
+      });
+      if ($("#view-log").classList.contains("active")) renderLog();
+    },
+    ensureTicking() {
+      if (this.tick != null) return;
+      this.tick = setInterval(() => this.onTick(), 250);
+    },
+    onTick() {
+      let anyLive = false;
+      for (const t of this.list) {
+        if (t.state === "running") {
+          anyLive = true;
+          if (!t.doneFired && this.remainingSec(t) <= 0) this.complete(t);
+        }
+      }
+      // keep ticking while there are running timers OR any done card flashing
+      const needTick = this.list.some((t) => t.state === "running");
+      updateTimerDisplays();
+      if (!needTick && this.tick != null && !this.list.some((t) => t.state === "done")) {
+        clearInterval(this.tick); this.tick = null;
+      }
+      void anyLive;
+    },
+    countForParam(paramId) {
+      return this.list.filter((t) => t.paramId === paramId && t.state !== "done").length;
+    },
+  };
+
+  /* ============================ Rendering ============================ */
+  const app = { view: "run" };
+
+  function setView(view) {
+    app.view = view;
+    document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+    $("#view-" + view).classList.add("active");
+    if (view === "run") renderRun();
+    else if (view === "edit") renderEdit();
+    else if (view === "log") renderLog();
+  }
+
+  function renderProtocolSelect() {
+    const list = $("#protocolList");
+    list.innerHTML = store.protocols.map((p) => {
+      const active = p.id === store.activeId;
+      return `<button class="protocol-pill${active ? " active" : ""}" role="tab"
+        aria-selected="${active}" data-act="switch-protocol" data-protocol="${p.id}"
+        title="${esc(p.name)}">${esc(p.name)}</button>`;
+    }).join("");
+    const activePill = list.querySelector(".protocol-pill.active");
+    if (activePill) activePill.scrollIntoView({ block: "nearest", inline: "nearest" });
+
+    const delItem = $("#deleteProtocolMenuItem");
+    const onlyOne = store.protocols.length === 1;
+    delItem.disabled = onlyOne;
+    delItem.title = onlyOne ? "Can't delete the only protocol — create another first" : "";
+  }
+
+  /* ---- Protocol actions menu (⋯) ---- */
+  function closeProtocolMenu() {
+    const menu = $("#protocolMenu");
+    if (!menu || menu.hasAttribute("hidden")) return;
+    menu.setAttribute("hidden", "");
+    const btn = document.querySelector('[data-act="toggle-protocol-menu"]');
+    if (btn) btn.setAttribute("aria-expanded", "false");
+  }
+  function openProtocolMenu(btn) {
+    $("#protocolMenu").removeAttribute("hidden");
+    btn.setAttribute("aria-expanded", "true");
+  }
+
+  /* ---- Run view ---- */
+  function renderRun() {
+    const p = store.active();
+    const el = $("#view-run");
+    if (!p.steps.length) {
+      el.innerHTML = `<div class="empty">This protocol has no steps yet.<br>
+        <button class="btn primary" data-act="goto-edit" style="margin-top:12px">Add steps in Edit →</button></div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="row" style="margin-bottom:14px">
+        <h2 style="margin:0">${esc(p.name)}</h2>
+        ${p.description ? `<span class="muted">${esc(p.description)}</span>` : ""}
+      </div>
+      ${p.steps.map((s, i) => `
+        <div class="step">
+          <div class="step-head">
+            <div class="step-num">${i + 1}</div>
+            <div style="flex:1">
+              <div class="step-title">${esc(s.title || "Untitled step")}</div>
+              ${s.note ? `<div class="note"><span class="note-label">If it fails</span>${esc(s.note)}</div>` : ""}
+              <div class="chips">
+                ${s.params.length ? s.params.map((pr) => {
+                  const c = timers.countForParam(pr.id);
+                  return `<button class="chip" data-act="start-timer" data-param="${pr.id}">
+                    ${esc(pr.label)} <span class="dur">${fmtDur(pr.defaultDurationSec)}</span>
+                    ${c ? `<span class="count">${c}</span>` : ""}
+                  </button>`;
+                }).join("") : `<span class="muted" style="font-size:13px">No parameters</span>`}
+              </div>
+            </div>
+          </div>
+        </div>`).join("")}
+      <p class="muted" style="font-size:13px;margin-top:14px">Tap a chip to start a countdown. Tap the same chip again to run a second one in parallel.</p>
+    `;
+  }
+  // Cheap update of just the chip counts (avoids full re-render on every timer change).
+  function renderRunChipsCounts() {
+    if (app.view !== "run") return;
+    document.querySelectorAll('#view-run .chip[data-param]').forEach((chip) => {
+      const c = timers.countForParam(chip.dataset.param);
+      let badge = chip.querySelector(".count");
+      if (c) {
+        if (!badge) { badge = document.createElement("span"); badge.className = "count"; chip.appendChild(badge); }
+        badge.textContent = c;
+      } else if (badge) { badge.remove(); }
+    });
+  }
+
+  /* ---- Dock ---- */
+  function renderDock() {
+    const dock = $("#dock");
+    const wrap = $("#timers");
+    const list = timers.list;
+    dock.hidden = list.length === 0;
+    $("#dockCount").textContent = list.length;
+    const anyDone = list.some((t) => t.state === "done");
+    $("#clearDoneBtn").hidden = !anyDone;
+    $("#silenceBtn").hidden = alarm.activeCount === 0;
+
+    wrap.innerHTML = list.map((t) => {
+      const rem = timers.remainingSec(t);
+      const pct = Math.min(100, Math.max(0, (timers.elapsedMs(t) / 1000 / t.plannedSec) * 100));
+      const cls = t.state === "done" ? "done" : t.state === "paused" ? "paused" : "";
+      const timeTxt = t.state === "done" ? "Done" : fmtClock(rem);
+      const controls = t.state === "done"
+        ? `<button class="btn small primary" data-act="dismiss-timer" data-id="${t.id}" style="flex:1">Dismiss</button>`
+        : `<button class="btn small" data-act="pause-timer" data-id="${t.id}" style="flex:1">${t.state === "paused" ? "Resume" : "Pause"}</button>
+           <button class="btn small danger" data-act="stop-timer" data-id="${t.id}" style="flex:1">Stop</button>`;
+      return `<div class="timer ${cls}" data-id="${t.id}">
+        <div class="t-meta"><b>${esc(t.stepTitle)}</b> · ${esc(t.paramLabel)}</div>
+        <div class="t-time" data-time>${timeTxt}</div>
+        <div class="t-bar"><div class="t-fill" data-fill style="width:${pct}%"></div></div>
+        <div class="t-controls">${controls}</div>
+      </div>`;
+    }).join("");
+  }
+  // Lightweight per-tick update of countdown text + progress bars only.
+  function updateTimerDisplays() {
+    for (const t of timers.list) {
+      const card = document.querySelector(`.timer[data-id="${t.id}"]`);
+      if (!card) continue;
+      const timeEl = card.querySelector("[data-time]");
+      const fillEl = card.querySelector("[data-fill]");
+      if (t.state === "done") { if (timeEl) timeEl.textContent = "Done"; continue; }
+      const rem = timers.remainingSec(t);
+      if (timeEl) timeEl.textContent = fmtClock(rem);
+      if (fillEl) {
+        const pct = Math.min(100, Math.max(0, (timers.elapsedMs(t) / 1000 / t.plannedSec) * 100));
+        fillEl.style.width = pct + "%";
+      }
+    }
+  }
+
+  /* ---- Edit view ---- */
+  function renderEdit() {
+    const p = store.active();
+    const el = $("#view-edit");
+    el.innerHTML = `
+      <div class="field">
+        <label>Protocol name</label>
+        <input id="ed-name" value="${esc(p.name)}" data-edit="protocol-name" style="width:100%;max-width:480px" />
+      </div>
+      <div class="field">
+        <label>Description</label>
+        <input id="ed-desc" value="${esc(p.description || "")}" data-edit="protocol-desc" style="width:100%;max-width:640px" placeholder="Optional" />
+      </div>
+
+      <div class="row" style="justify-content:space-between;margin:18px 0 10px">
+        <h3 style="margin:0">Steps</h3>
+        <button class="btn primary small" data-act="add-step">+ Add step</button>
+      </div>
+
+      ${p.steps.map((s, i) => `
+        <div class="edit-step" data-step="${s.id}">
+          <div class="es-head">
+            <div class="es-order">
+              <button class="btn icon small" data-act="step-up" data-step="${s.id}" ${i === 0 ? "disabled" : ""} title="Move up">▲</button>
+              <button class="btn icon small" data-act="step-down" data-step="${s.id}" ${i === p.steps.length - 1 ? "disabled" : ""} title="Move down">▼</button>
+            </div>
+            <div class="step-num">${i + 1}</div>
+            <input value="${esc(s.title)}" placeholder="Step title" data-edit="step-title" data-step="${s.id}" />
+            <button class="btn danger small" data-act="del-step" data-step="${s.id}">Delete</button>
+          </div>
+          <div class="field" style="margin:10px 0 6px">
+            <label>Failure / troubleshooting note</label>
+            <textarea placeholder="Optional — what to check if this step doesn't work" data-edit="step-note" data-step="${s.id}">${esc(s.note || "")}</textarea>
+          </div>
+          <div class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.4px;margin-top:6px">Parameters</div>
+          ${s.params.map((pr, j) => `
+            <div class="param-row" data-param="${pr.id}" data-step="${s.id}">
+              <span class="drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>
+              <div class="es-order">
+                <button class="btn icon small" data-act="param-up" data-step="${s.id}" data-param="${pr.id}" ${j === 0 ? "disabled" : ""} title="Move up">▲</button>
+                <button class="btn icon small" data-act="param-down" data-step="${s.id}" data-param="${pr.id}" ${j === s.params.length - 1 ? "disabled" : ""} title="Move down">▼</button>
+              </div>
+              <input class="p-label" value="${esc(pr.label)}" placeholder="Label, e.g. Blocking buffer" data-edit="param-label" data-step="${s.id}" data-param="${pr.id}" />
+              <span class="dur-input">
+                <input type="number" min="0" value="${Math.floor(pr.defaultDurationSec / 60)}" data-edit="param-min" data-step="${s.id}" data-param="${pr.id}" /> min
+                <input type="number" min="0" max="59" value="${pr.defaultDurationSec % 60}" data-edit="param-sec" data-step="${s.id}" data-param="${pr.id}" /> s
+              </span>
+              <button class="btn danger small" data-act="del-param" data-step="${s.id}" data-param="${pr.id}">✕</button>
+            </div>`).join("")}
+          <div style="margin-top:10px">
+            <button class="btn small" data-act="add-param" data-step="${s.id}">+ Add parameter</button>
+          </div>
+        </div>`).join("")}
+
+      ${p.steps.length === 0 ? `<div class="empty">No steps yet — add one above.</div>` : ""}
+    `;
+  }
+
+  /* ---- Run Log ---- */
+  function renderLog() {
+    const el = $("#view-log");
+    const log = store.runlog;
+    // Filters
+    const fProto = el.__fProto || "";
+    const fParam = (el.__fParam || "").toLowerCase();
+
+    const protoOpts = [...new Set(log.map((e) => e.protocolName))];
+    const filtered = log.filter((e) =>
+      (!fProto || e.protocolName === fProto) &&
+      (!fParam || e.paramLabel.toLowerCase().includes(fParam)));
+
+    // Drift summary grouped by protocol+param
+    const groups = {};
+    for (const e of filtered) {
+      const k = e.protocolName + " ▸ " + e.paramLabel;
+      (groups[k] || (groups[k] = [])).push(e);
+    }
+    const summaryCards = Object.entries(groups).map(([k, arr]) => {
+      const drifts = arr.map((e) => e.driftSec);
+      const mean = drifts.reduce((a, b) => a + b, 0) / drifts.length;
+      const cls = mean > 0.5 ? "drift-pos" : mean < -0.5 ? "drift-neg" : "drift-zero";
+      return `<div class="summary-card">
+        <div class="sc-label">${esc(k)}</div>
+        <div class="sc-stat">${arr.length} run${arr.length > 1 ? "s" : ""} · mean drift
+          <b class="${cls}">${fmtDrift(Math.round(mean))}</b></div>
+      </div>`;
+    }).join("");
+
+    el.innerHTML = `
+      <div class="logbar">
+        <h2 style="margin:0">Run Log</h2>
+        <div class="spacer" style="flex:1"></div>
+        <select data-log-filter="proto" title="Filter by protocol">
+          <option value="">All protocols</option>
+          ${protoOpts.map((n) => `<option value="${esc(n)}"${n === fProto ? " selected" : ""}>${esc(n)}</option>`).join("")}
+        </select>
+        <input data-log-filter="param" placeholder="Filter parameter…" value="${esc(el.__fParam || "")}" style="width:160px" />
+        <button class="btn small" data-act="export-json">Export JSON</button>
+        <button class="btn small danger" data-act="clear-log">Clear log</button>
+      </div>
+
+      ${filtered.length === 0
+        ? `<div class="empty">${log.length === 0 ? "No runs logged yet. Start and stop a timer to see drift here." : "No entries match the filter."}</div>`
+        : `
+        ${summaryCards ? `<div class="summary-grid">${summaryCards}</div>` : ""}
+        <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>When</th><th>Protocol</th><th>Step</th><th>Parameter</th>
+            <th class="num">Planned</th><th class="num">Actual</th><th class="num">Drift</th><th>Outcome</th>
+          </tr></thead>
+          <tbody>
+            ${filtered.map((e) => {
+              const dc = e.driftSec > 0 ? "drift-pos" : e.driftSec < 0 ? "drift-neg" : "drift-zero";
+              return `<tr>
+                <td>${esc(fmtDateTime(e.endedAt))}</td>
+                <td>${esc(e.protocolName)}</td>
+                <td>${esc(e.stepTitle)}</td>
+                <td>${esc(e.paramLabel)}</td>
+                <td class="num">${fmtClock(e.plannedSec)}</td>
+                <td class="num">${fmtClock(e.actualSec)}</td>
+                <td class="num ${dc}">${fmtDrift(e.driftSec)}</td>
+                <td><span class="tag ${e.outcome}">${e.outcome}</span></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+        </div>`}
+    `;
+  }
+
+  /* ============================ Actions ============================ */
+  function download(filename, text) {
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  const actions = {
+    "goto-edit": () => setView("edit"),
+
+    "switch-protocol": (el) => {
+      closeProtocolMenu();
+      const id = el.dataset.protocol;
+      if (id === store.activeId) return;
+      store.activeId = id;
+      store.saveActive();
+      renderProtocolSelect();
+      if (app.view === "run") renderRun();
+      else if (app.view === "edit") renderEdit();
+    },
+
+    "toggle-protocol-menu": (el) => {
+      const menu = $("#protocolMenu");
+      if (menu.hasAttribute("hidden")) openProtocolMenu(el);
+      else closeProtocolMenu();
+    },
+
+    "new-protocol": () => {
+      closeProtocolMenu();
+      const p = { id: uid(), name: "New protocol", description: "", steps: [] };
+      store.protocols.push(p);
+      store.activeId = p.id;
+      store.saveProtocols(); store.saveActive();
+      renderProtocolSelect(); setView("edit");
+      // Jump to the name field so it can be renamed immediately.
+      const nameInput = $("#ed-name");
+      if (nameInput) { nameInput.focus(); nameInput.select(); }
+    },
+    "duplicate-protocol": () => {
+      closeProtocolMenu();
+      const src = store.active();
+      const copy = JSON.parse(JSON.stringify(src));
+      copy.id = uid();
+      copy.name = src.name + " (copy)";
+      copy.steps.forEach((s) => { s.id = uid(); s.params.forEach((pr) => (pr.id = uid())); });
+      store.protocols.push(copy);
+      store.activeId = copy.id;
+      store.saveProtocols(); store.saveActive();
+      renderProtocolSelect(); setView("edit");
+    },
+    "del-protocol": () => {
+      closeProtocolMenu();
+      if (store.protocols.length === 1) { alert("You can't delete the only protocol. Create another first."); return; }
+      const p = store.active();
+      if (!confirm(`Delete protocol "${p.name}"? This cannot be undone. (Run log entries are kept.)`)) return;
+      store.protocols = store.protocols.filter((x) => x.id !== p.id);
+      store.activeId = store.protocols[0].id;
+      store.saveProtocols(); store.saveActive();
+      renderProtocolSelect();
+      if (app.view === "run") renderRun();
+      else if (app.view === "edit") renderEdit();
+      else if (app.view === "log") renderLog();
+    },
+
+    "start-timer": (el) => {
+      const p = store.active();
+      const found = store.findParam(p, el.dataset.param);
+      if (found) timers.add({ protocol: p, step: found.step, param: found.param });
+    },
+    "pause-timer": (el) => timers.pauseResume(el.dataset.id),
+    "stop-timer": (el) => timers.stop(el.dataset.id),
+    "dismiss-timer": (el) => timers.dismiss(el.dataset.id),
+    "clear-done": () => { timers.list.filter((t) => t.state === "done").forEach((t) => timers.dismiss(t.id)); },
+    "silence-all": () => alarm.stopAll(),
+
+    // ---- Edit: steps ----
+    "add-step": () => {
+      const p = store.active();
+      p.steps.push({ id: uid(), title: "New step", note: "", params: [] });
+      store.saveProtocols(); renderEdit();
+    },
+    "del-step": (el) => {
+      const p = store.active();
+      const s = store.findStep(p, el.dataset.step);
+      if (!confirm(`Delete step "${s.title}"?`)) return;
+      p.steps = p.steps.filter((x) => x.id !== el.dataset.step);
+      store.saveProtocols(); renderEdit();
+    },
+    "step-up": (el) => moveItem(store.active().steps, el.dataset.step, -1),
+    "step-down": (el) => moveItem(store.active().steps, el.dataset.step, +1),
+
+    // ---- Edit: params ----
+    "add-param": (el) => {
+      const s = store.findStep(store.active(), el.dataset.step);
+      s.params.push({ id: uid(), label: "New parameter", defaultDurationSec: 300 });
+      store.saveProtocols(); renderEdit();
+    },
+    "del-param": (el) => {
+      const s = store.findStep(store.active(), el.dataset.step);
+      s.params = s.params.filter((x) => x.id !== el.dataset.param);
+      store.saveProtocols(); renderEdit();
+    },
+    "param-up": (el) => moveItem(store.findStep(store.active(), el.dataset.step).params, el.dataset.param, -1),
+    "param-down": (el) => moveItem(store.findStep(store.active(), el.dataset.step).params, el.dataset.param, +1),
+
+    // ---- Run log ----
+    "export-json": () => {
+      download("regi-backup-" + new Date().toISOString().slice(0, 10) + ".json",
+        JSON.stringify({ schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(),
+          protocols: store.protocols, runlog: store.runlog }, null, 2));
+    },
+    "clear-log": () => {
+      if (!store.runlog.length) return;
+      if (!confirm("Clear the entire run log? This cannot be undone.")) return;
+      store.runlog = []; store.saveRunlog(); renderLog();
+    },
+  };
+
+  function moveItem(arr, id, dir) {
+    const i = arr.findIndex((x) => x.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    store.saveProtocols(); renderEdit();
+  }
+
+  /* ---- Drag-and-drop reordering of parameters (Edit view) ---- */
+  // The ▲/▼ buttons remain as a fallback for touch/keyboard.
+  let dragCtx = null; // { stepId, paramId }
+  function clearDropMarkers() {
+    document.querySelectorAll(".param-row.drop-before, .param-row.drop-after")
+      .forEach((r) => r.classList.remove("drop-before", "drop-after"));
+  }
+  function cleanupDrag() {
+    clearDropMarkers();
+    document.querySelectorAll(".param-row.dragging").forEach((r) => r.classList.remove("dragging"));
+    dragCtx = null;
+  }
+  document.addEventListener("dragstart", (e) => {
+    const handle = e.target.closest(".drag-handle");
+    if (!handle) return;
+    const row = handle.closest(".param-row");
+    if (!row) return;
+    dragCtx = { stepId: row.dataset.step, paramId: row.dataset.param };
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", row.dataset.param); } catch (_) {}
+    try { e.dataTransfer.setDragImage(row, 16, 16); } catch (_) {}
+    // Defer so the drag image is captured before the row dims.
+    requestAnimationFrame(() => row.classList.add("dragging"));
+  });
+  document.addEventListener("dragover", (e) => {
+    if (!dragCtx) return;
+    const row = e.target.closest(".param-row");
+    if (!row || row.dataset.step !== dragCtx.stepId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const rect = row.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    clearDropMarkers();
+    if (row.dataset.param !== dragCtx.paramId) row.classList.add(before ? "drop-before" : "drop-after");
+  });
+  document.addEventListener("drop", (e) => {
+    if (!dragCtx) return;
+    const row = e.target.closest(".param-row");
+    if (!row || row.dataset.step !== dragCtx.stepId) { cleanupDrag(); return; }
+    e.preventDefault();
+    const rect = row.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    const step = store.findStep(store.active(), dragCtx.stepId);
+    if (!step) { cleanupDrag(); return; }
+    const from = step.params.findIndex((p) => p.id === dragCtx.paramId);
+    if (from < 0) { cleanupDrag(); return; }
+    const [moved] = step.params.splice(from, 1);
+    let to = step.params.findIndex((p) => p.id === row.dataset.param);
+    if (to < 0) { step.params.splice(from, 0, moved); cleanupDrag(); return; } // dropped on itself: no-op
+    if (!before) to += 1;
+    step.params.splice(to, 0, moved);
+    store.saveProtocols();
+    cleanupDrag();
+    renderEdit();
+  });
+  document.addEventListener("dragend", cleanupDrag);
+
+  /* ============================ Event wiring ============================ */
+  // Delegated clicks
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    const act = btn.dataset.act;
+    if (actions[act]) { e.preventDefault(); actions[act](btn); }
+  });
+
+  // Tabs
+  $("#tabs").addEventListener("click", (e) => {
+    const t = e.target.closest(".tab");
+    if (t) setView(t.dataset.view);
+  });
+
+  // Close the protocol (⋯) menu on outside click or Escape.
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".menu-wrap")) closeProtocolMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeProtocolMenu();
+  });
+
+  // Delegated edits (input/change) for the Edit view
+  document.addEventListener("input", (e) => {
+    const el = e.target.closest("[data-edit]");
+    if (!el) return;
+    const p = store.active();
+    const kind = el.dataset.edit;
+    const s = el.dataset.step ? store.findStep(p, el.dataset.step) : null;
+    switch (kind) {
+      case "protocol-name":
+        p.name = el.value;
+        renderProtocolSelect();
+        break;
+      case "protocol-desc": p.description = el.value; break;
+      case "step-title": if (s) s.title = el.value; break;
+      case "step-note": if (s) s.note = el.value; break;
+      case "param-label": {
+        const pr = s && s.params.find((x) => x.id === el.dataset.param);
+        if (pr) pr.label = el.value;
+        break;
+      }
+      case "param-min":
+      case "param-sec": {
+        const pr = s && s.params.find((x) => x.id === el.dataset.param);
+        if (pr) {
+          const row = el.closest(".param-row");
+          const min = Math.max(0, parseInt(row.querySelector('[data-edit="param-min"]').value || "0", 10));
+          let sec = Math.max(0, parseInt(row.querySelector('[data-edit="param-sec"]').value || "0", 10));
+          if (sec > 59) sec = 59;
+          pr.defaultDurationSec = min * 60 + sec;
+        }
+        break;
+      }
+      default: return;
+    }
+    store.saveProtocols();
+  });
+
+  // Log filters (change/input on the log view controls)
+  document.addEventListener("input", (e) => {
+    const f = e.target.closest("[data-log-filter]");
+    if (!f) return;
+    const el = $("#view-log");
+    if (f.dataset.logFilter === "param") { el.__fParam = f.value; renderLog(); }
+  });
+  document.addEventListener("change", (e) => {
+    const f = e.target.closest("[data-log-filter]");
+    if (!f) return;
+    const el = $("#view-log");
+    if (f.dataset.logFilter === "proto") { el.__fProto = f.value; renderLog(); }
+  });
+
+  // First user gesture anywhere unlocks audio (belt-and-suspenders alongside chip taps)
+  window.addEventListener("pointerdown", () => alarm.unlock(), { once: true });
+
+  // Warn before closing/reloading if timers are live (they aren't persisted, by design)
+  window.addEventListener("beforeunload", (e) => {
+    if (timers.list.some((t) => t.state === "running")) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
+  /* ============================ Boot ============================ */
+  store.load();
+  renderProtocolSelect();
+  setView("run");
+  renderDock();
+})();
+</script>
+</body>
+</html>
